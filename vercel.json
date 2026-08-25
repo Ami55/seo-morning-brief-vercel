@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "framework": "vite",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/daily-brief",
+      "schedule": "0 14 * * *"
+    }
+  ]
+}

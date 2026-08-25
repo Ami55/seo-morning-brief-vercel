@@ -1,0 +1,6 @@
+{
+  "name": "SEO Morning Brief",
+  "description": "Senior-level SEO intelligence briefing application that monitors official Google sources, search patents, publications, and industry experts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
