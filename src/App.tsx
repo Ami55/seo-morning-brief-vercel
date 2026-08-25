@@ -359,7 +359,7 @@ export default function App() {
         onClose={() => setIsTestEmailModalOpen(false)}
         latestBriefing={latestBriefing}
         defaultRecipient={settings?.recipientEmail || 'ameneh.saeednia@gmail.com'}
-        defaultFrom={settings?.fromEmail || 'SEO Morning Brief <briefing@updates.yourdomain.com>'}
+        defaultFrom={settings?.fromEmail || 'SEO Morning Brief <onboarding@resend.dev>'}
       />
 
       <HowItWorksModal isOpen={isHowItWorksOpen} onClose={() => setIsHowItWorksOpen(false)} />

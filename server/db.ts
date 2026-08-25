@@ -34,7 +34,7 @@ function getDefaultSettings(): AppSettings {
     timezone: 'America/Vancouver',
     deliveryTime: '10:00',
     recipientEmail: process.env.EMAIL_TO || 'ameneh.saeednia@gmail.com',
-    fromEmail: process.env.EMAIL_FROM || 'SEO Morning Brief <briefing@updates.yourdomain.com>',
+    fromEmail: process.env.EMAIL_FROM || 'SEO Morning Brief <onboarding@resend.dev>',
     appBaseUrl: process.env.APP_BASE_URL || 'https://ais-dev-ezqavj6nl52thupjokqy4f-197119453669.us-west2.run.app',
     minScoreThreshold: 60,
     highPriorityThreshold: 85,
@@ -466,8 +466,18 @@ function createInitialDatabase(): DatabaseSchema {
 }
 
 function redisConfig(): { url: string; token: string } | undefined {
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.STORAGE_REST_API_URL || process.env.STORAGE_KV_REST_API_URL || process.env.STORAGE_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || process.env.STORAGE_REST_API_TOKEN || process.env.STORAGE_KV_REST_API_TOKEN || process.env.STORAGE_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_KV_REST_API_URL
+    || process.env.UPSTASH_REDIS_REST_URL
+    || process.env.KV_REST_API_URL
+    || process.env.STORAGE_REST_API_URL
+    || process.env.STORAGE_KV_REST_API_URL
+    || process.env.STORAGE_URL;
+  const token = process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN
+    || process.env.UPSTASH_REDIS_REST_TOKEN
+    || process.env.KV_REST_API_TOKEN
+    || process.env.STORAGE_REST_API_TOKEN
+    || process.env.STORAGE_KV_REST_API_TOKEN
+    || process.env.STORAGE_TOKEN;
   return url && token ? { url: url.replace(/\/$/, ''), token } : undefined;
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Mail, Send, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import { Briefing } from '../types';
 
@@ -21,6 +21,13 @@ export const SendTestEmailModal: React.FC<SendTestEmailModalProps> = ({
   const [fromAddress, setFromAddress] = useState(defaultFrom || 'SEO Morning Brief <briefing@updates.yourdomain.com>');
   const [isSending, setIsSending] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setRecipient(defaultRecipient || 'ameneh.saeednia@gmail.com');
+    setFromAddress(defaultFrom || 'SEO Morning Brief <onboarding@resend.dev>');
+    setResult(null);
+  }, [isOpen, defaultRecipient, defaultFrom]);
 
   if (!isOpen) return null;
 

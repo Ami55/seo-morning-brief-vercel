@@ -433,7 +433,7 @@ export async function sendBriefingEmail(
 ): Promise<{ success: boolean; deliveryId?: string; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   const to = recipientEmail || process.env.EMAIL_TO || 'ameneh.saeednia@gmail.com';
-  const from = fromEmail || process.env.EMAIL_FROM || 'SEO Morning Brief <briefing@updates.yourdomain.com>';
+  const from = fromEmail || process.env.EMAIL_FROM || 'SEO Morning Brief <onboarding@resend.dev>';
 
   if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('re_...')) {
     console.warn('RESEND_API_KEY is not configured or is a placeholder. Simulating email dispatch.');
