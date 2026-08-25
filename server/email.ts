@@ -432,7 +432,11 @@ export async function sendBriefingEmail(
   fromEmail?: string
 ): Promise<{ success: boolean; deliveryId?: string; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
-  const to = recipientEmail || process.env.EMAIL_TO || 'ameneh.saeednia@gmail.com';
+  const recipientValue = recipientEmail || process.env.EMAIL_TO || 'ameneh.saeednia@gmail.com';
+  const to = [...new Set(recipientValue
+    .split(/[;,]/)
+    .map((email) => email.trim())
+    .filter(Boolean))];
   const from = fromEmail || process.env.EMAIL_FROM || 'SEO Morning Brief <onboarding@resend.dev>';
 
   if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('re_...')) {
@@ -440,6 +444,13 @@ export async function sendBriefingEmail(
     return {
       success: true,
       deliveryId: `sim-resend-${Date.now()}`
+    };
+  }
+
+  if (to.length === 0 || to.some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    return {
+      success: false,
+      error: 'Enter valid recipient email addresses separated by commas.'
     };
   }
 

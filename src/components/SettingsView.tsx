@@ -82,14 +82,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block font-bold text-slate-700 mb-1">
-                Recipient Email (Target Reader)
+                Recipient Emails (comma-separated)
               </label>
               <input
                 type="email"
+                multiple
                 required
                 value={recipientEmail}
                 onChange={(e) => setRecipientEmail(e.target.value)}
-                placeholder="ameneh.saeednia@gmail.com"
+                placeholder="first@example.com, second@example.com"
                 className="w-full p-2.5 bg-slate-50/80 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none"
               />
               <p className="text-[11px] text-slate-400 mt-1">

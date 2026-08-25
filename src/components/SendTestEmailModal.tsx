@@ -93,13 +93,15 @@ export const SendTestEmailModal: React.FC<SendTestEmailModalProps> = ({
         <form onSubmit={handleSend} className="space-y-4 text-xs">
           <div>
             <label className="block font-bold text-slate-700 mb-1">
-              Recipient Email Address
+              Recipient Email Address(es)
             </label>
             <input
               type="email"
+              multiple
               required
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
+              placeholder="first@example.com, second@example.com"
               className="w-full p-2.5 bg-slate-50/80 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none"
             />
           </div>
