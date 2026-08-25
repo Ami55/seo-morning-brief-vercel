@@ -26,6 +26,22 @@ export async function handleDailyBriefCron(req: Request, res: Response): Promise
     }
   }
 
+  // Vercel schedules in UTC. Two triggers cover Vancouver's PDT/PST offsets;
+  // only the trigger that lands at 10:00 local time performs the daily run.
+  const vancouverHour = Number(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Vancouver',
+    hour: '2-digit',
+    hourCycle: 'h23'
+  }).format(new Date()));
+  if (vancouverHour !== 10) {
+    res.status(200).json({
+      status: 'timezone_skip',
+      message: 'Skipped because it is not 10:00 AM in Vancouver.',
+      vancouverHour
+    });
+    return;
+  }
+
   // Idempotency check: has a briefing already been sent today?
   const settings = await db.getSettings();
   const latestRun = await db.getLatestSuccessfulRun();

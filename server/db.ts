@@ -32,7 +32,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 function getDefaultSettings(): AppSettings {
   return {
     timezone: 'America/Vancouver',
-    deliveryTime: '07:00',
+    deliveryTime: '10:00',
     recipientEmail: process.env.EMAIL_TO || 'ameneh.saeednia@gmail.com',
     fromEmail: process.env.EMAIL_FROM || 'SEO Morning Brief <briefing@updates.yourdomain.com>',
     appBaseUrl: process.env.APP_BASE_URL || 'https://ais-dev-ezqavj6nl52thupjokqy4f-197119453669.us-west2.run.app',
@@ -519,6 +519,8 @@ function refreshRuntimeSettings(data: DatabaseSchema): DatabaseSchema {
   data.runs ||= [];
   data.errorLogs ||= [];
   data.lock ||= { isLocked: false };
+  // Migrate the original default schedule to 10:00 AM Vancouver time.
+  if (data.settings.deliveryTime === '07:00') data.settings.deliveryTime = '10:00';
   data.settings.hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY?.trim());
   data.settings.hasResendKey = Boolean(process.env.RESEND_API_KEY?.trim());
   data.settings.hasCronSecret = Boolean(process.env.CRON_SECRET?.trim());

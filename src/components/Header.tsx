@@ -7,6 +7,7 @@ import {
   Lock,
   SearchCheck,
   CheckCircle2
+  ,HelpCircle
 } from 'lucide-react';
 import { AppSettings } from '../types';
 
@@ -14,6 +15,7 @@ interface HeaderProps {
   settings: AppSettings | null;
   onOpenRunModal: () => void;
   onOpenTestEmailModal: () => void;
+  onOpenHowItWorks: () => void;
   isLocked: boolean;
 }
 
@@ -21,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   settings,
   onOpenRunModal,
   onOpenTestEmailModal,
+  onOpenHowItWorks,
   isLocked
 }) => {
   const deliveryTimeFormatted = settings?.deliveryTime || '07:00 AM';
@@ -71,6 +74,14 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center space-x-2.5">
+            <button
+              id="how-it-works-btn"
+              onClick={onOpenHowItWorks}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer shadow-2xs"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="hidden sm:inline">How It Works</span>
+            </button>
             {/* Test Email Button */}
             <button
               id="test-email-btn"
