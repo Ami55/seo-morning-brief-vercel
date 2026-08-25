@@ -246,36 +246,11 @@ function loadDatabase(): DatabaseSchema {
     console.error('Error reading database file, initializing defaults:', err);
   }
 
-  const initialBriefing = createInitialBriefing();
   const initialDb: DatabaseSchema = {
     sources: DEFAULT_SOURCES,
-    discoveredItems: [
-      ...initialBriefing.highPriorityHighlights,
-      ...initialBriefing.expertPerspectives
-    ],
-    briefings: [initialBriefing],
-    runs: [
-      {
-        id: 'run-init-seed',
-        startedAt: new Date(Date.now() - 3600 * 1000 * 4).toISOString(),
-        completedAt: new Date(Date.now() - 3600 * 1000 * 3.8).toISOString(),
-        status: 'completed',
-        sourcesChecked: 18,
-        itemsDiscovered: 14,
-        itemsSelected: 3,
-        emailStatus: 'skipped',
-        triggeredBy: 'manual',
-        researchWindowStart: new Date(Date.now() - 3600 * 1000 * 28).toISOString(),
-        researchWindowEnd: new Date(Date.now() - 3600 * 1000 * 4).toISOString(),
-        briefingId: initialBriefing.id,
-        logs: [
-          'Initial system setup and discovery baseline established.',
-          'Sources checked: 18 sources evaluated.',
-          'Deduplicated and scored 14 candidates.',
-          'Generated briefing: 3 high-impact intelligence items selected.'
-        ]
-      }
-    ],
+    discoveredItems: [],
+    briefings: [],
+    runs: [],
     settings: getDefaultSettings(),
     lock: {
       isLocked: false
@@ -479,11 +454,10 @@ const legacyFileDb = {
 };
 
 function createInitialDatabase(): DatabaseSchema {
-  const initialBriefing = createInitialBriefing();
   return {
     sources: DEFAULT_SOURCES,
-    discoveredItems: [...initialBriefing.highPriorityHighlights, ...initialBriefing.expertPerspectives],
-    briefings: [initialBriefing],
+    discoveredItems: [],
+    briefings: [],
     runs: [],
     settings: getDefaultSettings(),
     lock: { isLocked: false },
@@ -492,8 +466,8 @@ function createInitialDatabase(): DatabaseSchema {
 }
 
 function redisConfig(): { url: string; token: string } | undefined {
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.STORAGE_REST_API_URL || process.env.STORAGE_KV_REST_API_URL || process.env.STORAGE_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || process.env.STORAGE_REST_API_TOKEN || process.env.STORAGE_KV_REST_API_TOKEN || process.env.STORAGE_TOKEN;
   return url && token ? { url: url.replace(/\/$/, ''), token } : undefined;
 }
 
@@ -519,6 +493,14 @@ function refreshRuntimeSettings(data: DatabaseSchema): DatabaseSchema {
   data.runs ||= [];
   data.errorLogs ||= [];
   data.lock ||= { isLocked: false };
+  // Remove the original AI Studio demonstration briefing and its hard-coded stories.
+  data.briefings = data.briefings.filter((briefing) =>
+    !briefing.itemIds?.some((id) => id.startsWith('item-seed-'))
+  );
+  const liveItemIds = new Set(data.briefings.flatMap((briefing) => briefing.itemIds || []));
+  data.discoveredItems = data.discoveredItems.filter((item) =>
+    !item.id.startsWith('item-seed-') || liveItemIds.has(item.id)
+  );
   // Migrate the original default schedule to 10:00 AM Vancouver time.
   if (data.settings.deliveryTime === '07:00') data.settings.deliveryTime = '10:00';
   data.settings.hasOpenAiKey = Boolean(process.env.OPENAI_API_KEY?.trim());

@@ -208,6 +208,8 @@ export function createApiApp() {
   // --- SECURE CRON SCHEDULED ENDPOINT ---
   app.get('/api/cron/daily-brief', handleDailyBriefCron);
   app.post('/api/cron/daily-brief', handleDailyBriefCron);
+  app.get('/api/cron/daily-brief-pdt', handleDailyBriefCron);
+  app.get('/api/cron/daily-brief-pst', handleDailyBriefCron);
 
   // --- TEST EMAIL API ---
   app.post('/api/test-email', async (req: Request, res: Response) => {

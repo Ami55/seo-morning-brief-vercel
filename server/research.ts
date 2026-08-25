@@ -113,7 +113,7 @@ function normalizeTitle(title: string): string {
     .substring(0, 60);
 }
 
-export async function fetchRssFeedItems(source: Source): Promise<DiscoveredItem[]> {
+export async function fetchRssFeedItems(source: Source, windowStart?: string, windowEnd?: string): Promise<DiscoveredItem[]> {
   if (!source.feedUrl) return [];
 
   try {
@@ -124,6 +124,9 @@ export async function fetchRssFeedItems(source: Source): Promise<DiscoveredItem[
       if (!entry.title || !entry.link) continue;
 
       const pubDate = entry.isoDate || entry.pubDate || new Date().toISOString();
+      const publishedAtMs = Date.parse(pubDate);
+      if (windowStart && Number.isFinite(publishedAtMs) && publishedAtMs < Date.parse(windowStart)) continue;
+      if (windowEnd && Number.isFinite(publishedAtMs) && publishedAtMs > Date.parse(windowEnd)) continue;
       const contentSnippet = entry.contentSnippet || entry.summary || entry.title || '';
 
       const factors: ScoreFactors = {
@@ -179,8 +182,8 @@ export async function runOpenAiResearch(
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('sk-...')) {
-    console.warn('OPENAI_API_KEY is not set or is placeholder. Generating high-precision structured fallback intelligence.');
-    return generateFallbackCandidateItems(windowStart, windowEnd, sources);
+    console.warn('OPENAI_API_KEY is not set or is placeholder. Returning RSS-only intelligence.');
+    return [];
   }
 
   try {
@@ -289,12 +292,12 @@ Each candidate item must include:
       }
     }
 
-    console.warn('OpenAI response did not contain structured JSON items list, generating fallback items.');
-    return generateFallbackCandidateItems(windowStart, windowEnd, sources);
+    console.warn('OpenAI response did not contain a structured items list. Returning RSS-only intelligence.');
+    return [];
   } catch (err: any) {
     await db.logError('error', `OpenAI Responses API error: ${err.message || 'Timeout/API Error'}`, 'runOpenAiResearch');
-    console.error('OpenAI Responses API error, falling back to cached baseline:', err);
-    return generateFallbackCandidateItems(windowStart, windowEnd, sources);
+    console.error('OpenAI Responses API error; no synthetic news will be generated:', err);
+    return [];
   }
 }
 
@@ -506,7 +509,7 @@ export async function executeFullResearchWorkflow(options: {
     const discoveredFromRss: DiscoveredItem[] = [];
     for (const source of sources) {
       if (source.feedUrl && source.enabled) {
-        const feedItems = await fetchRssFeedItems(source);
+        const feedItems = await fetchRssFeedItems(source, windowStart, windowEnd);
         if (feedItems.length > 0) {
           discoveredFromRss.push(...feedItems);
           source.lastSuccessfulCheckAt = new Date().toISOString();

@@ -3,7 +3,7 @@
   "framework": "vite",
   "functions": {
     "api/index.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "rewrites": [
@@ -18,11 +18,11 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/daily-brief",
+      "path": "/api/cron/daily-brief-pdt",
       "schedule": "0 17 * * *"
     },
     {
-      "path": "/api/cron/daily-brief",
+      "path": "/api/cron/daily-brief-pst",
       "schedule": "0 18 * * *"
     }
   ]

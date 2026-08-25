@@ -271,7 +271,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span>Scheduled Execution Endpoint (Cloud Scheduler / Vercel Cron)</span>
           </div>
           <p className="text-slate-300 leading-relaxed">
-            Set up an automated cron trigger to hit this endpoint daily at 07:00 AM:
+            Vercel triggers two UTC schedules for daylight and standard time; only the request that lands at 10:00 AM Vancouver time runs:
           </p>
           <div className="bg-slate-950 p-4 rounded-xl font-mono text-[11px] text-slate-200 overflow-x-auto border border-slate-800">
             curl -X POST "{settings?.appBaseUrl || 'https://your-domain.com'}/api/cron/daily-brief" \<br />
