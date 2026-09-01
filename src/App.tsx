@@ -242,7 +242,10 @@ export default function App() {
     }
   };
 
-  const isLocked = runs.some((r) => r.status === 'running') || isRunningResearch;
+  const staleRunCutoff = Date.now() - 15 * 60 * 1000;
+  const isLocked = runs.some((r) =>
+    r.status === 'running' && Date.parse(r.startedAt) >= staleRunCutoff
+  ) || isRunningResearch;
   const latestBriefing = selectedBriefing || (briefings.length > 0 ? briefings[0] : null);
 
   return (

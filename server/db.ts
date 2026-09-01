@@ -503,6 +503,19 @@ function refreshRuntimeSettings(data: DatabaseSchema): DatabaseSchema {
   data.runs ||= [];
   data.errorLogs ||= [];
   data.lock ||= { isLocked: false };
+  // Serverless functions can be terminated before the workflow records failure.
+  // Recover those orphaned records so the UI does not remain "Pipeline Busy" forever.
+  const staleRunCutoff = Date.now() - 15 * 60 * 1000;
+  for (const run of data.runs) {
+    if (run.status === 'running' && Date.parse(run.startedAt) < staleRunCutoff) {
+      run.status = 'failed';
+      run.completedAt = new Date().toISOString();
+      run.emailStatus = 'failed';
+      run.safeErrorMessage = 'The run did not finish within 15 minutes and was automatically released.';
+      run.logs ||= [];
+      run.logs.push('Recovered stale running record after a serverless timeout or interrupted execution.');
+    }
+  }
   // Remove the original AI Studio demonstration briefing and its hard-coded stories.
   data.briefings = data.briefings.filter((briefing) =>
     !briefing.itemIds?.some((id) => id.startsWith('item-seed-'))
