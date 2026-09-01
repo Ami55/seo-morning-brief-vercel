@@ -11,5 +11,7 @@ This version improves scheduled-email failure handling:
 - RSS feeds are checked concurrently instead of waiting up to eight seconds for each source in sequence.
 - OpenAI web research now has a 90-second upper bound, allowing the workflow to continue with RSS results if the AI request times out.
 - The browser request has a four-minute timeout and displays an actionable error instead of spinning forever.
+- Upstash Redis requests now fail clearly after 10 seconds instead of hanging the entire pipeline indefinitely.
+- Runs are released six minutes after they start, matching the deployment's five-minute serverless execution limit.
 
 After deploying, confirm that `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TO`, and `CRON_SECRET` are configured for the Production environment in Vercel.

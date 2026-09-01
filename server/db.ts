@@ -484,11 +484,24 @@ function redisConfig(): { url: string; token: string } | undefined {
 async function redisCommand<T = unknown>(command: unknown[]): Promise<T> {
   const config = redisConfig();
   if (!config) throw new Error('Upstash Redis environment variables are not configured.');
-  const response = await fetch(config.url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(command)
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  let response: Response;
+  try {
+    response = await fetch(config.url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(command),
+      signal: controller.signal
+    });
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error('Redis request timed out after 10 seconds. Check the Upstash integration and environment variables.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) throw new Error(`Redis request failed with status ${response.status}.`);
   const payload = await response.json() as { result?: T; error?: string };
   if (payload.error) throw new Error(payload.error);
@@ -505,13 +518,13 @@ function refreshRuntimeSettings(data: DatabaseSchema): DatabaseSchema {
   data.lock ||= { isLocked: false };
   // Serverless functions can be terminated before the workflow records failure.
   // Recover those orphaned records so the UI does not remain "Pipeline Busy" forever.
-  const staleRunCutoff = Date.now() - 15 * 60 * 1000;
+  const staleRunCutoff = Date.now() - 6 * 60 * 1000;
   for (const run of data.runs) {
     if (run.status === 'running' && Date.parse(run.startedAt) < staleRunCutoff) {
       run.status = 'failed';
       run.completedAt = new Date().toISOString();
       run.emailStatus = 'failed';
-      run.safeErrorMessage = 'The run did not finish within 15 minutes and was automatically released.';
+      run.safeErrorMessage = 'The run exceeded the five-minute serverless window and was automatically released.';
       run.logs ||= [];
       run.logs.push('Recovered stale running record after a serverless timeout or interrupted execution.');
     }
@@ -618,8 +631,8 @@ export const db = {
       const data = await loadCloudDatabase();
       if (data.lock.isLocked && data.lock.lockedAt) {
         const lockAge = Date.now() - Date.parse(data.lock.lockedAt);
-        if (Number.isFinite(lockAge) && lockAge < 15 * 60 * 1000) return false;
-        console.warn('Clearing stale in-memory run lock older than 15 minutes.');
+        if (Number.isFinite(lockAge) && lockAge < 6 * 60 * 1000) return false;
+        console.warn('Clearing stale in-memory run lock older than 6 minutes.');
       } else if (data.lock.isLocked) {
         console.warn('Clearing invalid in-memory run lock with no timestamp.');
       }
@@ -642,7 +655,7 @@ export const db = {
       const data = await loadCloudDatabase();
       if (data.lock.isLocked) {
         const lockAge = data.lock.lockedAt ? Date.now() - Date.parse(data.lock.lockedAt) : Number.POSITIVE_INFINITY;
-        if (!Number.isFinite(lockAge) || lockAge >= 15 * 60 * 1000) {
+        if (!Number.isFinite(lockAge) || lockAge >= 6 * 60 * 1000) {
           data.lock = { isLocked: false };
           await saveCloudDatabase(data);
         }

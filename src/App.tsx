@@ -251,7 +251,7 @@ export default function App() {
     }
   };
 
-  const staleRunCutoff = Date.now() - 15 * 60 * 1000;
+  const staleRunCutoff = Date.now() - 6 * 60 * 1000;
   const isLocked = runs.some((r) =>
     r.status === 'running' && Date.parse(r.startedAt) >= staleRunCutoff
   ) || isRunningResearch;
