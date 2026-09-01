@@ -603,7 +603,13 @@ export const db = {
   async acquireLock(lockedBy: string) {
     if (!redisConfig()) {
       const data = await loadCloudDatabase();
-      if (data.lock.isLocked) return false;
+      if (data.lock.isLocked && data.lock.lockedAt) {
+        const lockAge = Date.now() - Date.parse(data.lock.lockedAt);
+        if (Number.isFinite(lockAge) && lockAge < 15 * 60 * 1000) return false;
+        console.warn('Clearing stale in-memory run lock older than 15 minutes.');
+      } else if (data.lock.isLocked) {
+        console.warn('Clearing invalid in-memory run lock with no timestamp.');
+      }
       data.lock = { isLocked: true, lockedAt: new Date().toISOString(), lockedBy };
       await saveCloudDatabase(data);
       return true;
@@ -619,7 +625,17 @@ export const db = {
     }
   },
   async getLockStatus() {
-    if (!redisConfig()) return (await loadCloudDatabase()).lock;
+    if (!redisConfig()) {
+      const data = await loadCloudDatabase();
+      if (data.lock.isLocked) {
+        const lockAge = data.lock.lockedAt ? Date.now() - Date.parse(data.lock.lockedAt) : Number.POSITIVE_INFINITY;
+        if (!Number.isFinite(lockAge) || lockAge >= 15 * 60 * 1000) {
+          data.lock = { isLocked: false };
+          await saveCloudDatabase(data);
+        }
+      }
+      return data.lock;
+    }
     const raw = await redisCommand<string | null>(['GET', LOCK_KEY]);
     return raw ? { isLocked: true, ...JSON.parse(raw) } : { isLocked: false };
   },
