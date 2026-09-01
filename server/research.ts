@@ -188,7 +188,9 @@ export async function runOpenAiResearch(
 
   try {
     const openai = new OpenAI({
-      apiKey
+      apiKey,
+      timeout: 90000,
+      maxRetries: 0
     });
 
     const activeSourceNames = sources.filter((s) => s.enabled).map((s) => s.name).join(', ');
@@ -506,16 +508,22 @@ export async function executeFullResearchWorkflow(options: {
     options.onProgress?.(25, 'Querying sources and feeds', `Checking ${sources.length} active monitored sources...`);
 
     // 2. Discover via RSS Feeds
-    const discoveredFromRss: DiscoveredItem[] = [];
-    for (const source of sources) {
-      if (source.feedUrl && source.enabled) {
-        const feedItems = await fetchRssFeedItems(source, windowStart, windowEnd);
-        if (feedItems.length > 0) {
-          discoveredFromRss.push(...feedItems);
-          source.lastSuccessfulCheckAt = new Date().toISOString();
-          source.status = 'accessible';
-        }
+    // Fetch feeds concurrently. Sequential 8-second timeouts across 20 sources can
+    // exceed a serverless request window before AI research even begins.
+    const feedResults = await Promise.all(sources.map(async (source) => {
+      if (!source.feedUrl || !source.enabled) return [];
+      const feedItems = await fetchRssFeedItems(source, windowStart, windowEnd);
+      if (feedItems.length > 0) {
+        source.lastSuccessfulCheckAt = new Date().toISOString();
+        source.status = 'accessible';
       }
+      return feedItems;
+    }));
+    const discoveredFromRss = feedResults.flat();
+
+    // Keep database writes sequential because each source update modifies the
+    // shared JSON record in Redis.
+    for (const source of sources) {
       source.lastCheckedAt = new Date().toISOString();
       await db.upsertSource(source);
     }

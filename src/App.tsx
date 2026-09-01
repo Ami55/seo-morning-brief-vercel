@@ -103,6 +103,8 @@ export default function App() {
     setProgressStep('Acquiring lock and querying monitored sources...');
 
     try {
+      const controller = new AbortController();
+      const requestTimeout = setTimeout(() => controller.abort(), 240000);
       // Simulate progressive progress updates for seamless user feedback
       const p1 = setTimeout(() => {
         setProgressPercent(45);
@@ -111,12 +113,13 @@ export default function App() {
 
       const p2 = setTimeout(() => {
         setProgressPercent(75);
-        setProgressStep('Deduplicating candidates and scoring 6 strategic factors...');
+        setProgressStep('Research is processing on the server; this can take up to 2 minutes...');
       }, 2600);
 
       const res = await fetch('/api/research/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           sendEmailAfter,
           recipientEmail: settings?.recipientEmail
@@ -125,6 +128,7 @@ export default function App() {
 
       clearTimeout(p1);
       clearTimeout(p2);
+      clearTimeout(requestTimeout);
 
       const data = await res.json();
 
@@ -148,7 +152,12 @@ export default function App() {
       }
     } catch (err: any) {
       setIsRunningResearch(false);
-      showNotification('Run error: ' + err.message, 'error');
+      showNotification(
+        err.name === 'AbortError'
+          ? 'The research request exceeded 4 minutes. Check Run History for the server result.'
+          : 'Run error: ' + err.message,
+        'error'
+      );
     }
   };
 
