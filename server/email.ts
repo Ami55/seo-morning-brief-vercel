@@ -440,7 +440,14 @@ export async function sendBriefingEmail(
   const from = fromEmail || process.env.EMAIL_FROM || 'SEO Morning Brief <onboarding@resend.dev>';
 
   if (!apiKey || apiKey.trim() === '' || apiKey.startsWith('re_...')) {
-    console.warn('RESEND_API_KEY is not configured or is a placeholder. Simulating email dispatch.');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('RESEND_API_KEY is not configured or is a placeholder. Email was not sent.');
+      return {
+        success: false,
+        error: 'RESEND_API_KEY is not configured in the production environment.'
+      };
+    }
+    console.warn('RESEND_API_KEY is not configured or is a placeholder. Simulating email dispatch in development only.');
     return {
       success: true,
       deliveryId: `sim-resend-${Date.now()}`
@@ -454,36 +461,31 @@ export async function sendBriefingEmail(
     };
   }
 
-  try {
-    const resend = new Resend(apiKey);
-    const html = briefing.html || generateBriefingHtml(briefing);
-    const text = briefing.plainText || generateBriefingPlainText(briefing);
+  const resend = new Resend(apiKey);
+  const html = briefing.html || generateBriefingHtml(briefing);
+  const text = briefing.plainText || generateBriefingPlainText(briefing);
+  let lastError = 'Resend failed to deliver email.';
 
-    const result = await resend.emails.send({
-      from,
-      to,
-      subject: briefing.subject,
-      html,
-      text
-    });
-
-    if (result.error) {
-      console.error('Resend API error:', result.error);
-      return {
-        success: false,
-        error: result.error.message || 'Resend failed to deliver email.'
-      };
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const result = await resend.emails.send({ from, to, subject: briefing.subject, html, text });
+      if (!result.error) {
+        return {
+          success: true,
+          deliveryId: result.data?.id || `resend-${Date.now()}`
+        };
+      }
+      lastError = result.error.message || lastError;
+      console.error(`Resend API error (attempt ${attempt}/3):`, result.error);
+    } catch (err: any) {
+      lastError = err.message || 'Unknown network or authorization error when calling Resend.';
+      console.error(`Exception sending email via Resend (attempt ${attempt}/3):`, err);
     }
 
-    return {
-      success: true,
-      deliveryId: result.data?.id || `resend-${Date.now()}`
-    };
-  } catch (err: any) {
-    console.error('Exception sending email via Resend:', err);
-    return {
-      success: false,
-      error: err.message || 'Unknown network or authorization error when calling Resend.'
-    };
+    if (attempt < 3) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+    }
   }
+
+  return { success: false, error: `${lastError} (failed after 3 attempts)` };
 }

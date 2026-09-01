@@ -67,12 +67,24 @@ export async function handleDailyBriefCron(req: Request, res: Response): Promise
     });
 
     if (result.success) {
+      const completedRun = (await db.getRuns()).find((run) => run.id === result.runId);
+      if (settings.autoSendOnCron && completedRun?.emailStatus !== 'sent') {
+        res.status(502).json({
+          error: 'Research completed, but the scheduled email was not sent.',
+          status: 'email_failed',
+          runId: result.runId,
+          briefingId: result.briefing?.id,
+          emailStatus: completedRun?.emailStatus || 'unknown'
+        });
+        return;
+      }
       res.status(200).json({
         message: 'Daily SEO morning briefing research completed successfully.',
         runId: result.runId,
         briefingId: result.briefing?.id,
         itemsSelected: result.briefing?.itemsSelectedCount,
-        emailSent: settings.autoSendOnCron
+        emailSent: completedRun?.emailStatus === 'sent',
+        emailStatus: completedRun?.emailStatus
       });
     } else {
       res.status(500).json({
