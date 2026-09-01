@@ -13,5 +13,7 @@ This version improves scheduled-email failure handling:
 - The browser request has a four-minute timeout and displays an actionable error instead of spinning forever.
 - Upstash Redis requests now fail clearly after 10 seconds instead of hanging the entire pipeline indefinitely.
 - Runs are released six minutes after they start, matching the deployment's five-minute serverless execution limit.
+- Redis execution locks now expire after six minutes and stale Redis locks are deleted when a new run is requested.
+- Manual-run errors close the progress modal so the actual server message is visible instead of making the button appear unresponsive.
 
 After deploying, confirm that `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TO`, and `CRON_SECRET` are configured for the Production environment in Vercel.

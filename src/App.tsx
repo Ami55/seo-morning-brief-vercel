@@ -148,10 +148,12 @@ export default function App() {
         }, 600);
       } else {
         setIsRunningResearch(false);
+        setIsRunModalOpen(false);
         showNotification(data.error || 'Failed to complete research.', 'error');
       }
     } catch (err: any) {
       setIsRunningResearch(false);
+      setIsRunModalOpen(false);
       showNotification(
         err.name === 'AbortError'
           ? 'The research request exceeded 4 minutes. Check Run History for the server result.'

@@ -640,7 +640,7 @@ export const db = {
       await saveCloudDatabase(data);
       return true;
     }
-    return (await redisCommand<string | null>(['SET', LOCK_KEY, JSON.stringify({ lockedAt: new Date().toISOString(), lockedBy }), 'EX', 900, 'NX'])) === 'OK';
+    return (await redisCommand<string | null>(['SET', LOCK_KEY, JSON.stringify({ lockedAt: new Date().toISOString(), lockedBy }), 'EX', 360, 'NX'])) === 'OK';
   },
   async releaseLock() {
     if (redisConfig()) await redisCommand(['DEL', LOCK_KEY]);
@@ -663,7 +663,14 @@ export const db = {
       return data.lock;
     }
     const raw = await redisCommand<string | null>(['GET', LOCK_KEY]);
-    return raw ? { isLocked: true, ...JSON.parse(raw) } : { isLocked: false };
+    if (!raw) return { isLocked: false };
+    const lock = JSON.parse(raw) as { lockedAt?: string; lockedBy?: string };
+    const lockAge = lock.lockedAt ? Date.now() - Date.parse(lock.lockedAt) : Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(lockAge) || lockAge >= 6 * 60 * 1000) {
+      await redisCommand(['DEL', LOCK_KEY]);
+      return { isLocked: false };
+    }
+    return { isLocked: true, ...lock };
   },
   async logError(level: 'error' | 'warn' | 'info', message: string, context?: string) {
     const data = await loadCloudDatabase();
