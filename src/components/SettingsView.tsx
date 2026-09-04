@@ -85,8 +85,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 Recipient Emails (comma-separated)
               </label>
               <input
-                type="email"
-                multiple
+                type="text"
                 required
                 value={recipientEmail}
                 onChange={(e) => setRecipientEmail(e.target.value)}
@@ -94,7 +93,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full p-2.5 bg-slate-50/80 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                Where every daily morning briefing will be delivered.
+                Separate addresses with commas or semicolons. External recipients require a verified Resend sender domain.
               </p>
             </div>
 

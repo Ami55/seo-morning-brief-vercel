@@ -132,23 +132,23 @@ export function generateBriefingHtml(briefing: Briefing): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${briefing.subject}</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #fafaf9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1c1917;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #fafaf9; padding: 24px 12px;">
+<body style="margin: 0; padding: 0; background-color: #f7f8fc; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #151b2c;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f7f8fc; padding: 24px 12px;">
     <tr>
       <td align="center">
         <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 680px; background-color: #ffffff; border: 1px solid #e7e5e4; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
           
           <!-- Header -->
           <tr>
-            <td style="background-color: #0f172a; padding: 32px 28px; color: #ffffff; border-bottom: 3px solid #6366f1;">
+            <td style="background: linear-gradient(130deg,#0e172b 0%,#181a4b 55%,#390066 100%); padding: 38px 30px; color: #ffffff; border-bottom: 3px solid #5237ff;">
               <table width="100%" border="0" cellspacing="0" cellpadding="0">
                 <tr>
                   <td>
-                    <div style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #818cf8; margin-bottom: 6px;">
-                      Senior SEO Intelligence
+                    <div style="font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #a6a0ff; margin-bottom: 8px;">
+                      SEARCH INTELLIGENCE × AI ANALYSIS
                     </div>
-                    <h1 style="margin: 0 0 6px 0; font-size: 24px; font-weight: 800; color: #ffffff; line-height: 1.2;">
-                      SEO Morning Brief
+                    <h1 style="margin: 0 0 8px 0; font-size: 30px; font-weight: 800; letter-spacing: -1px; color: #ffffff; line-height: 1.15;">
+                      Your clearest view of search.
                     </h1>
                     <div style="font-size: 13px; color: #94a3b8; font-weight: 500;">
                       ${formattedDate}
@@ -458,6 +458,13 @@ export async function sendBriefingEmail(
     return {
       success: false,
       error: 'Enter valid recipient email addresses separated by commas.'
+    };
+  }
+
+  if (process.env.NODE_ENV === 'production' && to.length > 1 && /onboarding@resend\.dev/i.test(from)) {
+    return {
+      success: false,
+      error: 'Multiple external recipients require a verified Resend sending domain. Set EMAIL_FROM to an address on your verified domain instead of onboarding@resend.dev.'
     };
   }
 

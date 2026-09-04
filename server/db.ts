@@ -511,6 +511,12 @@ async function redisCommand<T = unknown>(command: unknown[]): Promise<T> {
 function refreshRuntimeSettings(data: DatabaseSchema): DatabaseSchema {
   data.settings ||= getDefaultSettings();
   data.sources = data.sources?.length ? data.sources : DEFAULT_SOURCES;
+  // Add newly shipped default sources to existing Redis databases without
+  // overwriting sources the user has edited or disabled.
+  const existingSourceIds = new Set(data.sources.map((source) => source.id));
+  for (const defaultSource of DEFAULT_SOURCES) {
+    if (!existingSourceIds.has(defaultSource.id)) data.sources.push(structuredClone(defaultSource));
+  }
   data.discoveredItems ||= [];
   data.briefings ||= [];
   data.runs ||= [];

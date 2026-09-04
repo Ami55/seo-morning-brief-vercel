@@ -96,14 +96,14 @@ export const SendTestEmailModal: React.FC<SendTestEmailModalProps> = ({
               Recipient Email Address(es)
             </label>
             <input
-              type="email"
-              multiple
+              type="text"
               required
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
               placeholder="first@example.com, second@example.com"
               className="w-full p-2.5 bg-slate-50/80 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:outline-none"
             />
+            <p className="text-[11px] text-slate-400 mt-1">Separate addresses with commas or semicolons. A verified sender domain is required for a company inbox.</p>
           </div>
 
           <div>

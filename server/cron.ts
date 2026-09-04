@@ -1,6 +1,12 @@
 import { Request, Response } from 'express';
 import { db } from './db.js';
-import { executeFullResearchWorkflow } from './research.js';
+import { executeFullResearchWorkflow, sendEmailAndRecord } from './research.js';
+
+function vancouverDate(date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(date);
+}
 
 export async function handleDailyBriefCron(req: Request, res: Response): Promise<void> {
   const authHeader = req.headers.authorization;
@@ -46,9 +52,9 @@ export async function handleDailyBriefCron(req: Request, res: Response): Promise
   const settings = await db.getSettings();
   const latestRun = await db.getLatestSuccessfulRun();
   const now = new Date();
-  const todayDateStr = now.toISOString().split('T')[0];
+  const todayDateStr = vancouverDate(now);
 
-  if (latestRun && latestRun.completedAt && latestRun.completedAt.startsWith(todayDateStr) && latestRun.emailStatus === 'sent') {
+  if (latestRun && latestRun.completedAt && vancouverDate(new Date(latestRun.completedAt)) === todayDateStr && latestRun.emailStatus === 'sent') {
     res.status(200).json({
       message: 'Briefing has already been successfully researched and sent for today.',
       status: 'idempotent_skip',
@@ -56,6 +62,24 @@ export async function handleDailyBriefCron(req: Request, res: Response): Promise
       completedAt: latestRun.completedAt
     });
     return;
+  }
+
+  // A transient Resend failure must retry the already-generated briefing. If we
+  // research again, the previous completed run advances the discovery window and
+  // the retry can incorrectly contain no stories.
+  if (latestRun && latestRun.completedAt && vancouverDate(new Date(latestRun.completedAt)) === todayDateStr && latestRun.emailStatus === 'failed' && latestRun.briefingId) {
+    const existingBriefing = await db.getBriefingById(latestRun.briefingId);
+    if (existingBriefing) {
+      const retry = await sendEmailAndRecord(existingBriefing, settings.recipientEmail, settings.fromEmail);
+      res.status(retry.success ? 200 : 502).json({
+        status: retry.success ? 'email_retry_sent' : 'email_retry_failed',
+        runId: latestRun.id,
+        briefingId: existingBriefing.id,
+        deliveryId: retry.deliveryId,
+        error: retry.error
+      });
+      return;
+    }
   }
 
   try {

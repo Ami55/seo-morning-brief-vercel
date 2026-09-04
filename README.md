@@ -109,6 +109,30 @@ The deployed application uses Upstash Redis for persistent storage and an expiri
 
 ## Daily Scheduler Setup (Cron)
 
+The included schedule fires at 10:00 AM in `America/Vancouver` across both
+daylight-saving offsets, with a 20-minute retry slot. The retry is idempotent:
+successful mail is never duplicated, and a failed Resend delivery retries the
+already-generated briefing instead of creating an empty replacement.
+
+Production reliability requires persistent Upstash Redis. Without the Redis
+environment variables listed above, serverless instances only retain in-memory
+state and cannot reliably deduplicate or retry across invocations.
+
+Search Engine Journal and Search Engine Land are primary daily publications: the
+feed reader checks a deeper window and reserves up to five fresh stories from
+each before filling the rest of the briefing. The email subject starts with a
+bell when either newsroom has new coverage.
+
+Search Engine Roundtable is also a primary source. Its deeper feed window is
+checked every morning, the newest `Daily Search Forum Recap` is reserved first,
+and up to four additional same-day Roundtable stories are included before
+lower-priority sources.
+
+`EMAIL_TO` accepts multiple comma- or semicolon-separated addresses. Sending to
+a second/external company inbox requires a verified Resend domain and an
+`EMAIL_FROM` address on that domain; `onboarding@resend.dev` is only suitable for
+initial tests to the Resend account owner's address.
+
 The application exposes a secure endpoint for daily automated execution:
 
 - **Endpoint**: `GET /api/cron/daily-brief`

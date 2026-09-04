@@ -22,8 +22,16 @@
       "schedule": "0 17 * * *"
     },
     {
+      "path": "/api/cron/daily-brief-pdt",
+      "schedule": "20 17 * * *"
+    },
+    {
       "path": "/api/cron/daily-brief-pst",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/daily-brief-pst",
+      "schedule": "20 18 * * *"
     }
   ]
 }

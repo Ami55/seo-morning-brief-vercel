@@ -23,11 +23,11 @@ export const DEFAULT_SOURCES: Source[] = [
     baseUrl: 'https://www.seroundtable.com/',
     feedUrl: 'https://www.seroundtable.com/index.xml',
     enabled: true,
-    priority: 92,
+    priority: 100,
     accessMethod: 'rss',
     category: 'industry_publication',
     status: 'rss_available',
-    notes: 'Fast reporting on SERP fluctuations, Google test features, unconfirmed updates and Barry Schwartz reporting.'
+    notes: 'Primary daily watch source. Always reserve the Daily Search Forum Recap plus up to four other same-day stories.'
   },
   {
     id: 'src-sej',
@@ -36,11 +36,24 @@ export const DEFAULT_SOURCES: Source[] = [
     baseUrl: 'https://www.searchenginejournal.com/',
     feedUrl: 'https://www.searchenginejournal.com/feed/',
     enabled: true,
-    priority: 88,
+    priority: 100,
     accessMethod: 'rss',
     category: 'industry_publication',
     status: 'rss_available',
-    notes: 'In-depth SEO reporting, technical guides, algorithm analysis and industry developments.'
+    notes: 'Primary daily watch source. Reserve up to five newly published stories in every briefing.'
+  },
+  {
+    id: 'src-search-engine-land',
+    name: 'Search Engine Land',
+    sourceType: 'publication',
+    baseUrl: 'https://searchengineland.com/',
+    feedUrl: 'https://searchengineland.com/feed',
+    enabled: true,
+    priority: 100,
+    accessMethod: 'rss',
+    category: 'industry_publication',
+    status: 'rss_available',
+    notes: 'Primary breaking-news watch source. Reserve same-day stories before lower-priority publications.'
   },
   {
     id: 'src-seobythesea',

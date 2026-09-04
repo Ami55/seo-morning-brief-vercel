@@ -120,7 +120,10 @@ export async function fetchRssFeedItems(source: Source, windowStart?: string, wi
     const feed = await rssParser.parseURL(source.feedUrl);
     const items: DiscoveredItem[] = [];
 
-    for (const entry of (feed.items || []).slice(0, 5)) {
+    // SEJ often publishes several useful pieces per day; inspect a deeper feed
+    // window so the five-story daily reserve is not lost to feed ordering.
+    const feedLimit = ['src-sej', 'src-search-engine-land', 'src-seroundtable'].includes(source.id) ? 15 : 5;
+    for (const entry of (feed.items || []).slice(0, feedLimit)) {
       if (!entry.title || !entry.link) continue;
 
       const pubDate = entry.isoDate || entry.pubDate || new Date().toISOString();
@@ -553,8 +556,27 @@ export async function executeFullResearchWorkflow(options: {
     // Sort by priority score descending
     qualifiedItems.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-    // Select 5-10 highlights (or fewer if quiet period)
-    const selectedItems = qualifiedItems.slice(0, 10);
+    // Reserve same-day coverage from the two primary industry newsrooms before
+    // filling the remaining slots with the strongest items from other sources.
+    const sejItems = qualifiedItems
+      .filter((item) => item.sourceId === 'src-sej' || item.sourceName === 'Search Engine Journal')
+      .slice(0, 5);
+    const selItems = qualifiedItems
+      .filter((item) => item.sourceId === 'src-search-engine-land' || item.sourceName === 'Search Engine Land')
+      .slice(0, 5);
+    const roundtableItems = qualifiedItems
+      .filter((item) => item.sourceId === 'src-seroundtable' || item.sourceName === 'Search Engine Roundtable');
+    const dailyForumRecap = roundtableItems
+      .filter((item) => /daily search forum recap/i.test(item.title))
+      .slice(0, 1);
+    const otherRoundtableItems = roundtableItems
+      .filter((item) => !dailyForumRecap.some((recap) => recap.canonicalUrl === item.canonicalUrl))
+      .slice(0, 4);
+    const reservedPublisherItems = [...dailyForumRecap, ...selItems, ...sejItems, ...otherRoundtableItems];
+    const selectedItems = [
+      ...reservedPublisherItems,
+      ...qualifiedItems.filter((item) => !reservedPublisherItems.some((reserved) => reserved.canonicalUrl === item.canonicalUrl))
+    ].slice(0, 15);
 
     options.onProgress?.(80, 'Synthesizing morning brief', 'Compiling executive summary and section taxonomy...');
 
@@ -614,8 +636,17 @@ export async function executeFullResearchWorkflow(options: {
     const updateName = activeUpdate ? activeUpdate.title : undefined;
 
     const formattedDate = new Date().toISOString().split('T')[0];
+    const sejCount = selectedItems.filter((item) => item.sourceId === 'src-sej' || item.sourceName === 'Search Engine Journal').length;
+    const selCount = selectedItems.filter((item) => item.sourceId === 'src-search-engine-land' || item.sourceName === 'Search Engine Land').length;
+    const hasDailyForumRecap = selectedItems.some((item) => /daily search forum recap/i.test(item.title));
     const subject = isUpdateActive
       ? `🚨 Google Update: ${updateName} — SEO Morning Brief`
+      : hasDailyForumRecap
+      ? `🔔 Daily Search Forum Recap + today’s search news — SEO Morning Brief`
+      : selCount > 0
+      ? `🔔 ${selCount} new Search Engine Land ${selCount === 1 ? 'story' : 'stories'} — SEO Morning Brief`
+      : sejCount > 0
+      ? `🔔 ${sejCount} new SEJ ${sejCount === 1 ? 'story' : 'stories'} — SEO Morning Brief`
       : `SEO Morning Brief — ${formattedDate}`;
 
     const sourcesList = selectedItems.map((item) => ({

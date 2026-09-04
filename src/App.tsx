@@ -299,6 +299,17 @@ export default function App() {
         sourcesCount={sources.length}
       />
 
+      <section className="brief-hero" aria-labelledby="brief-hero-title">
+        <div className="brief-hero__status"><i /> SEARCH INTELLIGENCE × AI ANALYSIS</div>
+        <h1 id="brief-hero-title">Your clearest view of search,<br/><span>before the day gets noisy.</span></h1>
+        <p>Fresh Google updates, Daily Search Forum Recap, Search Engine Land, Search Engine Journal, expert analysis, and patents—scored and distilled for your 10 AM Vancouver briefing.</p>
+        <div className="brief-hero__meta">
+          <span><b>10:00 AM</b> Vancouver delivery</span>
+          <span><b>Daily news priority</b> Recap, SEL &amp; SEJ reserved</span>
+          <span><b>Automatic retry</b> Failed delivery recovery</span>
+        </div>
+      </section>
+
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {activeTab === 'latest' && (
