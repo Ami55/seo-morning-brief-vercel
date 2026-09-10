@@ -3,7 +3,6 @@ import {
   Sparkles,
   Send,
   Clock,
-  Globe2,
   Lock,
   SearchCheck,
   CheckCircle2
@@ -28,7 +27,6 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const deliveryTimeFormatted = settings?.deliveryTime || '07:00 AM';
   const timezoneFormatted = settings?.timezone || 'America/Vancouver';
-  const recipient = settings?.recipientEmail || 'Configured Strategist';
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
@@ -57,18 +55,12 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Center Info Pill (Schedule & Target) */}
-          <div className="hidden lg:flex items-center gap-4 bg-slate-50/80 border border-slate-200/60 px-3.5 py-1.5 rounded-full text-xs text-slate-600">
+          {/* Center schedule pill */}
+          <div className="hidden lg:flex items-center bg-slate-50/80 border border-slate-200/60 px-3.5 py-1.5 rounded-full text-xs text-slate-600">
             <div className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-indigo-600" />
               <span className="font-semibold text-slate-800">{deliveryTimeFormatted}</span>
               <span className="text-slate-400 text-[11px]">({timezoneFormatted.split('/')[1]?.replace('_', ' ') || timezoneFormatted})</span>
-            </div>
-            <div className="w-px h-3.5 bg-slate-200" />
-            <div className="flex items-center gap-1.5">
-              <Globe2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="text-slate-500">To:</span>
-              <span className="font-medium text-slate-800 truncate max-w-[140px]">{recipient}</span>
             </div>
           </div>
 
