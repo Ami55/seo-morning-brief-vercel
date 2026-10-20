@@ -120,7 +120,6 @@ export default function App() {
       } finally { checking = false; }
     }, 300000);
     return () => clearInterval(interval);
-      {connectionError && <div role="alert" className="m-4 rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">{connectionError} <button className="ml-2 underline" onClick={() => loadData()}>Retry</button></div>}
   }, []);
 
   // Handle Manual Run Trigger
@@ -288,6 +287,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50/60 text-slate-900 flex flex-col font-sans selection:bg-indigo-100 selection:text-indigo-900">
+      {connectionError && <div role="alert" className="m-4 rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">{connectionError} <button className="ml-2 underline" onClick={() => loadData()}>Retry</button></div>}
       
       {/* Toast Notification */}
       {notification && (
