@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { gzipSync, gunzipSync } from 'node:zlib';
 import path from 'path';
 import { AppSettings, Briefing, DiscoveredItem, Run, Source } from '../src/types.js';
 import { DEFAULT_SOURCES } from './defaultSources.js';
@@ -502,7 +503,14 @@ async function redisCommand<T = unknown>(command: unknown[]): Promise<T> {
   } finally {
     clearTimeout(timeout);
   }
-  if (!response.ok) throw new Error(`Redis request failed with status ${response.status}.`);
+  if (!response.ok) {
+    // The provider's body distinguishes quota suspension from invalid credentials.
+    const detail = (await response.text()).slice(0, 1500);
+    if (/bandwidth|suspend|quota|limit exceeded/i.test(detail)) {
+      throw new Error('Database access is suspended or quota-limited. Check the Upstash usage and plan dashboard.');
+    }
+    throw new Error(`Redis request failed with status ${response.status}. Check database status and credentials.`);
+  }
   const payload = await response.json() as { result?: T; error?: string };
   if (payload.error) throw new Error(payload.error);
   return payload.result as T;
@@ -554,41 +562,60 @@ function refreshRuntimeSettings(data: DatabaseSchema): DatabaseSchema {
   return data;
 }
 
-async function loadCloudDatabase(): Promise<DatabaseSchema> {
+// v1 is retained as a backup. Each v2 field migrates lazily, without downloading
+// unrelated history. HSETNX prevents a concurrent first read overwriting new data.
+const COLLECTION_KEY = 'seo-morning-brief:collections:v2';
+type Collection = keyof DatabaseSchema;
+function encodeCollection(value: unknown): string {
+  return gzipSync(JSON.stringify(value)).toString('base64');
+}
+function decodeCollection(value: string): unknown {
+  return JSON.parse(gunzipSync(Buffer.from(value, 'base64')).toString('utf8'));
+}
+async function loadCloudDatabase(field: Collection): Promise<DatabaseSchema> {
   if (!redisConfig()) {
     if (process.env.VERCEL) throw new Error('Persistent storage is missing. Configure Upstash Redis REST URL and token in Vercel Production, then redeploy.');
     memoryDatabase ||= createInitialDatabase();
     return refreshRuntimeSettings(structuredClone(memoryDatabase));
   }
-  const raw = await redisCommand<string | null>(['GET', DB_KEY]);
-  if (!raw) {
-    const initial = createInitialDatabase();
-    await redisCommand(['SET', DB_KEY, JSON.stringify(initial)]);
-    return refreshRuntimeSettings(initial);
+  let encoded = await redisCommand<string | null>(['HGET', COLLECTION_KEY, field]);
+  if (encoded === null) {
+    // Read the legacy JSON once for migration, preserving nested empty arrays
+    // exactly. The original key remains untouched as a backup.
+    const legacy = await redisCommand<string | null>(['GET', DB_KEY]);
+    const initial = legacy === null ? createInitialDatabase() : JSON.parse(legacy);
+    const defaults = createInitialDatabase();
+    for (const collection of Object.keys(defaults) as Collection[]) {
+      await redisCommand(['HSETNX', COLLECTION_KEY, collection,
+        encodeCollection(initial[collection] ?? defaults[collection])]);
+    }
+    encoded = await redisCommand<string>(['HGET', COLLECTION_KEY, field]);
   }
-  return refreshRuntimeSettings(typeof raw === 'string' ? JSON.parse(raw) : raw);
+  const data = createInitialDatabase();
+  (data as any)[field] = decodeCollection(encoded);
+  return refreshRuntimeSettings(data);
 }
 
-async function saveCloudDatabase(data: DatabaseSchema): Promise<void> {
+async function saveCloudDatabase(data: DatabaseSchema, field: Collection): Promise<void> {
   if (!redisConfig()) {
     memoryDatabase = structuredClone(data);
     return;
   }
-  await redisCommand(['SET', DB_KEY, JSON.stringify(data)]);
+  await redisCommand(['HSET', COLLECTION_KEY, field, encodeCollection(data[field])]);
 }
 
 export const db = {
-  async getSources() { return (await loadCloudDatabase()).sources; },
-  async getSourceById(id: string) { return (await loadCloudDatabase()).sources.find((s) => s.id === id); },
+  async getSources() { return (await loadCloudDatabase('sources')).sources; },
+  async getSourceById(id: string) { return (await loadCloudDatabase('sources')).sources.find((s) => s.id === id); },
   async upsertSource(source: Source) {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('sources');
     const index = data.sources.findIndex((s) => s.id === source.id);
     index >= 0 ? data.sources[index] = source : data.sources.push(source);
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'sources');
     return source;
   },
   async updateSourceChecks(sources: Source[]) {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('sources');
     for (const checked of sources) {
       const current = data.sources.find(source => source.id === checked.id);
       if (current) {
@@ -597,57 +624,57 @@ export const db = {
         current.status = checked.status;
       }
     }
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'sources');
   },
   async deleteSource(id: string) {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('sources');
     const before = data.sources.length;
     data.sources = data.sources.filter((s) => s.id !== id);
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'sources');
     return data.sources.length < before;
   },
   async getDiscoveredItems() {
-    return (await loadCloudDatabase()).discoveredItems.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+    return (await loadCloudDatabase('discoveredItems')).discoveredItems.sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
   },
   async saveDiscoveredItems(items: DiscoveredItem[]) {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('discoveredItems');
     for (const item of items) {
       const index = data.discoveredItems.findIndex((i) => i.id === item.id || i.canonicalUrl === item.canonicalUrl);
       index >= 0 ? data.discoveredItems[index] = { ...data.discoveredItems[index], ...item } : data.discoveredItems.push(item);
     }
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'discoveredItems');
   },
   async getBriefings() {
-    return (await loadCloudDatabase()).briefings.sort((a, b) => Date.parse(b.researchCompletedAt) - Date.parse(a.researchCompletedAt));
+    return (await loadCloudDatabase('briefings')).briefings.sort((a, b) => Date.parse(b.researchCompletedAt) - Date.parse(a.researchCompletedAt));
   },
   async getLatestBriefing() { return (await this.getBriefings())[0]; },
-  async getBriefingById(id: string) { return (await loadCloudDatabase()).briefings.find((b) => b.id === id); },
+  async getBriefingById(id: string) { return (await loadCloudDatabase('briefings')).briefings.find((b) => b.id === id); },
   async saveBriefing(briefing: Briefing) {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('briefings');
     const index = data.briefings.findIndex((b) => b.id === briefing.id);
     index >= 0 ? data.briefings[index] = briefing : data.briefings.unshift(briefing);
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'briefings');
     return briefing;
   },
-  async getRuns() { return (await loadCloudDatabase()).runs.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt)); },
+  async getRuns() { return (await loadCloudDatabase('runs')).runs.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt)); },
   async getLatestSuccessfulRun() { return (await this.getRuns()).find((r) => r.status === 'completed'); },
   async saveRun(run: Run) {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('runs');
     const index = data.runs.findIndex((r) => r.id === run.id);
     index >= 0 ? data.runs[index] = run : data.runs.unshift(run);
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'runs');
     return run;
   },
-  async getSettings() { return (await loadCloudDatabase()).settings; },
+  async getSettings() { return (await loadCloudDatabase('settings')).settings; },
   async updateSettings(settings: Partial<AppSettings>) {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('settings');
     data.settings = { ...data.settings, ...settings };
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'settings');
     return refreshRuntimeSettings(data).settings;
   },
   async acquireLock(lockedBy: string) {
     if (!redisConfig()) {
-      const data = await loadCloudDatabase();
+      const data = await loadCloudDatabase('lock');
       if (data.lock.isLocked && data.lock.lockedAt) {
         const lockAge = Date.now() - Date.parse(data.lock.lockedAt);
         if (Number.isFinite(lockAge) && lockAge < 6 * 60 * 1000) return false;
@@ -656,7 +683,7 @@ export const db = {
         console.warn('Clearing invalid in-memory run lock with no timestamp.');
       }
       data.lock = { isLocked: true, lockedAt: new Date().toISOString(), lockedBy };
-      await saveCloudDatabase(data);
+      await saveCloudDatabase(data, 'lock');
       return true;
     }
     return (await redisCommand<string | null>(['SET', LOCK_KEY, JSON.stringify({ lockedAt: new Date().toISOString(), lockedBy }), 'EX', 360, 'NX'])) === 'OK';
@@ -664,19 +691,19 @@ export const db = {
   async releaseLock() {
     if (redisConfig()) await redisCommand(['DEL', LOCK_KEY]);
     else {
-      const data = await loadCloudDatabase();
+      const data = await loadCloudDatabase('lock');
       data.lock = { isLocked: false };
-      await saveCloudDatabase(data);
+      await saveCloudDatabase(data, 'lock');
     }
   },
   async getLockStatus() {
     if (!redisConfig()) {
-      const data = await loadCloudDatabase();
+      const data = await loadCloudDatabase('lock');
       if (data.lock.isLocked) {
         const lockAge = data.lock.lockedAt ? Date.now() - Date.parse(data.lock.lockedAt) : Number.POSITIVE_INFINITY;
         if (!Number.isFinite(lockAge) || lockAge >= 6 * 60 * 1000) {
           data.lock = { isLocked: false };
-          await saveCloudDatabase(data);
+          await saveCloudDatabase(data, 'lock');
         }
       }
       return data.lock;
@@ -692,16 +719,16 @@ export const db = {
     return { isLocked: true, ...lock };
   },
   async logError(level: 'error' | 'warn' | 'info', message: string, context?: string) {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('errorLogs');
     data.errorLogs.unshift({ id: `err-${Date.now()}`, timestamp: new Date().toISOString(), level, message, context });
     data.errorLogs = data.errorLogs.slice(0, 100);
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'errorLogs');
   },
-  async getErrorLogs() { return (await loadCloudDatabase()).errorLogs; },
+  async getErrorLogs() { return (await loadCloudDatabase('errorLogs')).errorLogs; },
   async clearErrorLogs() {
-    const data = await loadCloudDatabase();
+    const data = await loadCloudDatabase('errorLogs');
     data.errorLogs = [];
-    await saveCloudDatabase(data);
+    await saveCloudDatabase(data, 'errorLogs');
   }
 };
 
