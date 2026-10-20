@@ -54,7 +54,7 @@ export async function handleDailyBriefCron(req: Request, res: Response): Promise
   const now = new Date();
   const todayDateStr = vancouverDate(now);
 
-  if (latestRun && latestRun.completedAt && vancouverDate(new Date(latestRun.completedAt)) === todayDateStr && latestRun.emailStatus === 'sent') {
+  if (latestRun && latestRun.completedAt && vancouverDate(new Date(latestRun.completedAt)) === todayDateStr && (latestRun.emailStatus === 'sent' || !settings.autoSendOnCron)) {
     res.status(200).json({
       message: 'Briefing has already been successfully researched and sent for today.',
       status: 'idempotent_skip',
@@ -71,6 +71,8 @@ export async function handleDailyBriefCron(req: Request, res: Response): Promise
     const existingBriefing = await db.getBriefingById(latestRun.briefingId);
     if (existingBriefing) {
       const retry = await sendEmailAndRecord(existingBriefing, settings.recipientEmail, settings.fromEmail);
+      latestRun.emailStatus = retry.success ? 'sent' : 'failed';
+      await db.saveRun(latestRun);
       res.status(retry.success ? 200 : 502).json({
         status: retry.success ? 'email_retry_sent' : 'email_retry_failed',
         runId: latestRun.id,

@@ -128,6 +128,7 @@ export async function fetchRssFeedItems(source: Source, windowStart?: string, wi
 
       const pubDate = entry.isoDate || entry.pubDate || new Date().toISOString();
       const publishedAtMs = Date.parse(pubDate);
+      if (!Number.isFinite(publishedAtMs)) continue;
       if (windowStart && Number.isFinite(publishedAtMs) && publishedAtMs < Date.parse(windowStart)) continue;
       if (windowEnd && Number.isFinite(publishedAtMs) && publishedAtMs > Date.parse(windowEnd)) continue;
       const contentSnippet = entry.contentSnippet || entry.summary || entry.title || '';
@@ -257,7 +258,13 @@ Each candidate item must include:
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       if (Array.isArray(parsed.items)) {
-        return parsed.items.map((raw: any) => {
+        return parsed.items.filter((raw: any) => {
+          if (typeof raw?.title !== 'string' || !raw.title.trim()) return false;
+          try {
+            const url = new URL(raw.canonicalUrl || raw.originalSourceUrl);
+            return ['https:', 'http:'].includes(url.protocol) && Number.isFinite(Date.parse(raw.publishedAt));
+          } catch { return false; }
+        }).map((raw: any) => {
           const factors: ScoreFactors = raw.scoreFactors || {
             seoImpact: 80,
             sourceAuthority: 85,
@@ -474,7 +481,7 @@ export async function executeFullResearchWorkflow(options: {
   const lastRun = await db.getLatestSuccessfulRun();
   let windowStart: string;
   if (lastRun && lastRun.completedAt) {
-    windowStart = lastRun.completedAt;
+    windowStart = lastRun.researchWindowEnd || lastRun.completedAt;
   } else {
     windowStart = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   }
@@ -492,7 +499,9 @@ export async function executeFullResearchWorkflow(options: {
 
   options.onProgress?.(10, 'Acquired run lock', 'Secured exclusive research execution lock.');
 
-  const runRecord = await db.saveRun({
+  let runRecord: import('../src/types.js').Run | undefined;
+  try {
+  runRecord = await db.saveRun({
     id: runId,
     startedAt: now.toISOString(),
     status: 'running',
@@ -506,7 +515,6 @@ export async function executeFullResearchWorkflow(options: {
     logs: [`Started research run triggered by ${options.triggeredBy}. Window: ${windowStart} -> ${windowEnd}`]
   });
 
-  try {
     const sources = (await db.getSources()).filter((s) => s.enabled);
     options.onProgress?.(25, 'Querying sources and feeds', `Checking ${sources.length} active monitored sources...`);
 
@@ -524,12 +532,11 @@ export async function executeFullResearchWorkflow(options: {
     }));
     const discoveredFromRss = feedResults.flat();
 
-    // Keep database writes sequential because each source update modifies the
-    // shared JSON record in Redis.
+    // Persist source check metadata in one read/write, rather than two requests per source.
     for (const source of sources) {
       source.lastCheckedAt = new Date().toISOString();
-      await db.upsertSource(source);
     }
+    await db.updateSourceChecks(sources);
 
     options.onProgress?.(45, 'AI Research & Web Analysis', 'Running OpenAI Responses API with web_search tools...');
 
@@ -541,7 +548,8 @@ export async function executeFullResearchWorkflow(options: {
 
     // 4. Deduplicate and score
     const existingItems = await db.getDiscoveredItems();
-    const uniqueCandidates = deduplicateCandidates(allDiscovered, existingItems);
+    const coveredIds = new Set((await db.getBriefings()).flatMap(briefing => briefing.itemIds));
+    const uniqueCandidates = deduplicateCandidates(allDiscovered, existingItems.filter(item => coveredIds.has(item.id)));
 
     // Save all discovered items to database
     await db.saveDiscoveredItems(uniqueCandidates);
@@ -729,6 +737,7 @@ export async function executeFullResearchWorkflow(options: {
     };
   } catch (err: any) {
     await db.logError('error', `Research workflow failed: ${err.message || 'Unknown error'}`, 'executeFullResearchWorkflow');
+    if (!runRecord) throw err;
     runRecord.status = 'failed';
     runRecord.completedAt = new Date().toISOString();
     runRecord.safeErrorMessage = err.message || 'An unexpected error occurred during intelligence discovery.';

@@ -556,6 +556,7 @@ function refreshRuntimeSettings(data: DatabaseSchema): DatabaseSchema {
 
 async function loadCloudDatabase(): Promise<DatabaseSchema> {
   if (!redisConfig()) {
+    if (process.env.VERCEL) throw new Error('Persistent storage is missing. Configure Upstash Redis REST URL and token in Vercel Production, then redeploy.');
     memoryDatabase ||= createInitialDatabase();
     return refreshRuntimeSettings(structuredClone(memoryDatabase));
   }
@@ -585,6 +586,18 @@ export const db = {
     index >= 0 ? data.sources[index] = source : data.sources.push(source);
     await saveCloudDatabase(data);
     return source;
+  },
+  async updateSourceChecks(sources: Source[]) {
+    const data = await loadCloudDatabase();
+    for (const checked of sources) {
+      const current = data.sources.find(source => source.id === checked.id);
+      if (current) {
+        current.lastCheckedAt = checked.lastCheckedAt;
+        current.lastSuccessfulCheckAt = checked.lastSuccessfulCheckAt;
+        current.status = checked.status;
+      }
+    }
+    await saveCloudDatabase(data);
   },
   async deleteSource(id: string) {
     const data = await loadCloudDatabase();
