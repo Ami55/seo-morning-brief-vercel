@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Navigation, TabKey } from './components/Navigation';
 import { LatestBriefingView } from './components/LatestBriefingView';
@@ -40,6 +40,10 @@ export default function App() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const hasLoadedData = useRef(false);
+  const runSignature = useRef('');
+
   // Initial Data Fetch
   const loadData = async () => {
     try {
@@ -51,6 +55,12 @@ export default function App() {
         fetch('/api/runs'),
         fetch('/api/errors')
       ]);
+
+      if ([briefingsRes, sourcesRes, itemsRes, settingsRes, runsRes, errorsRes].some(response => !response.ok)) {
+        throw new Error('Cannot load briefings from the server. Check database availability and Upstash bandwidth limits.');
+      }
+      setConnectionError(null);
+      hasLoadedData.current = true;
 
       if (briefingsRes.ok) {
         const bList = await briefingsRes.json();
@@ -78,6 +88,7 @@ export default function App() {
       if (runsRes.ok) {
         const rList = await runsRes.json();
         setRuns(rList);
+        runSignature.current = JSON.stringify(rList);
       }
 
       if (errorsRes.ok) {
@@ -86,14 +97,30 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error fetching initial data:', err);
+      setConnectionError(err instanceof Error ? err.message : 'Cannot load server data.');
     }
   };
 
   useEffect(() => {
     loadData();
-    // Poll updates every 30 seconds
-    const interval = setInterval(loadData, 30000);
+    // Only check the small run collection every five minutes while visible.
+    // Refresh full content when an execution changes, not six archives every 30s.
+    let checking = false;
+    const interval = setInterval(async () => {
+      if (document.visibilityState !== 'visible' || checking) return;
+      checking = true;
+      try {
+        if (!hasLoadedData.current) { await loadData(); return; }
+        const response = await fetch('/api/runs');
+        if (!response.ok) throw new Error('Cannot check new briefings. Check database availability and Upstash bandwidth limits.');
+        const nextRuns = await response.json();
+        if (JSON.stringify(nextRuns) !== runSignature.current) await loadData();
+      } catch (err) {
+        setConnectionError(err instanceof Error ? err.message : 'Cannot connect to the server.');
+      } finally { checking = false; }
+    }, 300000);
     return () => clearInterval(interval);
+      {connectionError && <div role="alert" className="m-4 rounded-lg border border-red-300 bg-red-50 p-4 text-red-800">{connectionError} <button className="ml-2 underline" onClick={() => loadData()}>Retry</button></div>}
   }, []);
 
   // Handle Manual Run Trigger
