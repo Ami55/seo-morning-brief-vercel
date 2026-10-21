@@ -419,7 +419,7 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200/80 py-6 text-center text-xs text-slate-500 mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>&copy; 2026 SEO Morning Brief. Developed by <strong className="text-slate-700">Ami - SEO Girl</strong>. All rights reserved.</span>
+          <span>&copy; 2026 SEO Morning Brief. Developed by <strong className="text-slate-700">SEO Girl - Ami</strong>. All rights reserved.</span>
           <span className="text-[11px] text-slate-400">
             OpenAI Web Research &bull; Resend Dispatch &bull; Google Patents Monitor
           </span>
